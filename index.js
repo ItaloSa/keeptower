@@ -73,13 +73,12 @@ export default class Keeptower {
 
   parsePayload(data, level) {
     const user_id = this.getCookie();
-    const payload = {};
-    payload.data = JSON.parse(JSON.stringify(data));
-    payload.keeptower_time = new Date().toISOString();
-    payload.keeptower_user_agent = navigator.userAgent;
-    payload.keeptower_user_id = user_id;
-    payload.keeptower_level = level;
-    return payload;
+    data = JSON.parse(JSON.stringify(data));
+    data.keeptower_time = new Date().toISOString();
+    data.keeptower_user_agent = navigator.userAgent;
+    data.keeptower_user_id = user_id;
+    data.keeptower_level = level;
+    return data;
   }
 
   setupCookie() {
