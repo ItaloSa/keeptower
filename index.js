@@ -1,53 +1,57 @@
-import { v4 as uuid } from 'uuid';
-import Cookies from 'js-cookie';
+import { v4 as uuid } from "uuid";
+import Cookies from "js-cookie";
 
 export default class Keeptower {
   constructor(options = {}) {
     Object.assign(
       this,
       {
-        endpoint: '',
+        endpoint: "",
         debug: false,
         local: true,
-        cookieName: 'keeptower',
+        cookieName: "keeptower",
         cookieDomain: window.location.hostname,
-        cookiePath: '/',
+        cookiePath: "/",
         cookieExpires: 365,
         fetchOptions: {}
       },
       options
-      );
-    this.debuggerInstance = null;
+    );
     this.userAgent = navigator.userAgent;
   }
 
   setup() {
     this.trackConsole();
     if (this.debug) {
-      this.debugger(`[Keeptower] Debug mode: ON\n ${JSON.stringify(this, null, 2)}`);
+      this.debugger(
+        `[Keeptower] Debug mode: ON\n ${JSON.stringify(this, null, 2)}`,
+        { debug: true }
+      );
     }
   }
 
-  debugger(...args) {
-    this.debuggerInstance.apply(console, args);
+  debugger(data) {
+    console.log(data, { keeptower_debug: true });
   }
 
   trackConsole() {
     const oldLog = console.log;
     const oldWarn = console.warn;
     const oldError = console.error;
-    console.log = this.sendConsoleCapture(oldLog, 'log');
-    console.warn = this.sendConsoleCapture(oldWarn, 'warn');
-    console.error = this.sendConsoleCapture(oldError, 'error');
-    this.debuggerInstance = oldLog;
+    console.log = this.sendConsoleCapture(oldLog, "log");
+    console.warn = this.sendConsoleCapture(oldWarn, "warn");
+    console.error = this.sendConsoleCapture(oldError, "error");
   }
 
   sendConsoleCapture(oldFunc, level) {
     const { local, debug } = this;
     return (...args) => {
       oldFunc.apply(console, args);
+      if (this.isDebug(args)) {
+        return;
+      }
       const [data] = args;
-      const payload = this.parsePayload(data);
+      const payload = this.parsePayload(data, level);
       if (!local) {
         this.postData(payload);
       } else if (debug) {
@@ -58,30 +62,32 @@ export default class Keeptower {
 
   postData(data) {
     fetch(this.endpoint, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
       ...this.fetchOptions
     }).catch((error) => {
-      this.debugger('[Keeptower]');
+      this.debugger("[Keeptower]");
       this.debugger(error);
     });
   }
 
-  parsePayload(data) {
+  parsePayload(data, level) {
     const user_id = this.getCookie();
-    data = JSON.parse(JSON.stringify(data));
-    data.keeptower_time = new Date().toISOString();
-    data.keeptower_user_agent = navigator.userAgent;
-    data.keeptower_user_id = user_id;
-    return data;
+    const payload = {};
+    payload.data = JSON.parse(JSON.stringify(data));
+    payload.keeptower_time = new Date().toISOString();
+    payload.keeptower_user_agent = navigator.userAgent;
+    payload.keeptower_user_id = user_id;
+    payload.keeptower_level = level;
+    return payload;
   }
-  
+
   setupCookie() {
     const identifier = uuid();
-    Cookies.set(this.cookieName, identifier, { 
-      expires: this.cookieExpires, 
-      path: this.cookiePath, 
-      domain: this.cookieHost 
+    Cookies.set(this.cookieName, identifier, {
+      expires: this.cookieExpires,
+      path: this.cookiePath,
+      domain: this.cookieHost
     });
     return identifier;
   }
@@ -95,5 +101,15 @@ export default class Keeptower {
       identifier = cookie;
     }
     return identifier;
+  }
+
+  isDebug(args) {
+    let isDebug = false;
+    args.forEach((arg) => {
+      if (typeof arg === "object" && Object.keys(arg).includes("keeptower_debug")) {
+        isDebug = true;
+      }
+    });
+    return isDebug;
   }
 }
